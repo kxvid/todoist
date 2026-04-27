@@ -39,7 +39,7 @@ Two tools for an ADHD-optimized Todoist workflow:
 ## Key implementation notes
 - **Model layer**: Vercel AI SDK (`ai`, `@ai-sdk/anthropic`, `@ai-sdk/openai`) — provider-agnostic. Configured at request-time via headers.
 - **BYOK**: Each user pastes their own provider + API key + model in the Settings panel. Stored in browser `localStorage`, sent as `x-model-*` headers per request, never persisted server-side.
-- **Hot-swappable providers**: Anthropic (Claude), OpenAI (GPT/o-series), and OpenAI-compatible (covers Ollama, LM Studio, vLLM, Groq, Together, Mistral, any local OSS server). Adding a new provider is one entry in `lib/providers.ts`.
+- **Hot-swappable providers**: Anthropic (Claude), OpenAI (GPT/o-series), Google Gemini (Flash/Pro), and OpenAI-compatible (covers Ollama, LM Studio, vLLM, Groq, Together, Mistral, any local OSS server). Adding a new provider is one entry in `lib/providers.ts`.
 - **Tool use**: `ai/tool()` definitions in `lib/tools.ts`. The AI SDK's `streamText` runs the loop with `maxSteps: 8`.
 - **Auth**: shared `APP_PASSWORD` bearer token gates the app. Per-user accounts (Clerk) and conversation persistence (Vercel KV) are deliberately not yet wired — design ready for them.
 - `lib/` is intentionally framework-free so it can be lifted into a React Native app later for an iOS App Store build.
