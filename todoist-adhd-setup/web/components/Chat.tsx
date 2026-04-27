@@ -7,6 +7,8 @@ import type { ChatMessage, StreamEvent } from "@/lib/types";
 interface ToolEvent {
   name: string;
   input: unknown;
+  result?: string;
+  isError?: boolean;
 }
 
 interface Turn {
@@ -94,6 +96,15 @@ export default function Chat({ token, provider }: Props) {
                 ...last,
                 tools: [...(last.tools ?? []), { name: event.name, input: event.input }],
               };
+            } else if (event.type === "tool_result") {
+              const tools = [...(last.tools ?? [])];
+              for (let i = tools.length - 1; i >= 0; i--) {
+                if (tools[i].name === event.name && tools[i].result === undefined) {
+                  tools[i] = { ...tools[i], result: event.output, isError: event.isError };
+                  break;
+                }
+              }
+              next[next.length - 1] = { ...last, tools };
             } else if (event.type === "error") {
               setError(event.message);
             }
@@ -162,12 +173,7 @@ function Bubble({ turn }: { turn: Turn }) {
         {turn.tools && turn.tools.length > 0 && (
           <div className="space-y-1">
             {turn.tools.map((tool, i) => (
-              <div
-                key={i}
-                className="inline-block rounded-md bg-zinc-900 px-2 py-1 text-xs text-zinc-500 ring-1 ring-zinc-800"
-              >
-                ⚙️ {tool.name}
-              </div>
+              <ToolPill key={i} tool={tool} />
             ))}
           </div>
         )}
@@ -179,4 +185,52 @@ function Bubble({ turn }: { turn: Turn }) {
       </div>
     </div>
   );
+}
+
+function ToolPill({ tool }: { tool: ToolEvent }) {
+  const status = tool.result === undefined ? "running" : tool.isError ? "error" : "ok";
+  const ringColor =
+    status === "error"
+      ? "ring-red-900"
+      : status === "ok"
+        ? "ring-emerald-900"
+        : "ring-zinc-800";
+  const icon = status === "error" ? "❌" : status === "ok" ? "✅" : "⚙️";
+  const args = formatJSON(tool.input);
+  const result = tool.result ?? (status === "running" ? "running…" : "");
+  return (
+    <details className={`rounded-md bg-zinc-900 px-2 py-1 text-xs text-zinc-400 ring-1 ${ringColor}`}>
+      <summary className="cursor-pointer list-none">
+        <span>{icon} </span>
+        <span className="font-medium text-zinc-300">{tool.name}</span>
+        <span className="ml-2 text-zinc-600">(tap for details)</span>
+      </summary>
+      <div className="mt-2 space-y-2 border-t border-zinc-800 pt-2">
+        <div>
+          <div className="text-[10px] uppercase tracking-wide text-zinc-600">Args</div>
+          <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-all text-zinc-400">
+            {args}
+          </pre>
+        </div>
+        <div>
+          <div className="text-[10px] uppercase tracking-wide text-zinc-600">Result</div>
+          <pre
+            className={`mt-1 overflow-x-auto whitespace-pre-wrap break-all ${
+              status === "error" ? "text-red-400" : "text-zinc-400"
+            }`}
+          >
+            {result}
+          </pre>
+        </div>
+      </div>
+    </details>
+  );
+}
+
+function formatJSON(value: unknown): string {
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
 }
