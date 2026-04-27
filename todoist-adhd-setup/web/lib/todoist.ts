@@ -1,4 +1,4 @@
-const BASE = "https://api.todoist.com/rest/v2";
+const BASE = "https://api.todoist.com/api/v1";
 
 async function req<T>(token: string, method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
@@ -16,6 +16,18 @@ async function req<T>(token: string, method: string, path: string, body?: unknow
     throw new Error(`Todoist ${method} ${path} → ${res.status}: ${text}`);
   }
   return res.json() as Promise<T>;
+}
+
+// v1 paginated list responses can come back as either a flat array (REST-v2-style)
+// or wrapped in { results: [...], next_cursor: "..." }. Tolerate both.
+async function reqList<T>(token: string, path: string): Promise<T[]> {
+  const data = await req<T[] | { results?: T[]; items?: T[] }>(token, "GET", path);
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray((data as { results?: T[] }).results))
+    return (data as { results: T[] }).results;
+  if (data && Array.isArray((data as { items?: T[] }).items))
+    return (data as { items: T[] }).items;
+  return [];
 }
 
 export interface Project {
@@ -44,16 +56,25 @@ export interface Label {
   color: string;
 }
 
-export const listProjects = (token: string) => req<Project[]>(token, "GET", "/projects");
-export const listLabels = (token: string) => req<Label[]>(token, "GET", "/labels");
+export const listProjects = (token: string) => reqList<Project>(token, "/projects");
+export const listLabels = (token: string) => reqList<Label>(token, "/labels");
 
-export const listTasks = (token: string, filter?: string, projectId?: string) => {
+export async function listTasks(
+  token: string,
+  filter?: string,
+  projectId?: string,
+): Promise<Task[]> {
+  // v1 splits filtering: plain GET /tasks for project/global lists,
+  // GET /tasks/filter?query=... for Todoist filter expressions.
+  if (filter) {
+    const qs = new URLSearchParams({ query: filter });
+    return reqList<Task>(token, `/tasks/filter?${qs.toString()}`);
+  }
   const qs = new URLSearchParams();
-  if (filter) qs.set("filter", filter);
   if (projectId) qs.set("project_id", projectId);
   const q = qs.toString();
-  return req<Task[]>(token, "GET", `/tasks${q ? `?${q}` : ""}`);
-};
+  return reqList<Task>(token, `/tasks${q ? `?${q}` : ""}`);
+}
 
 export const getTask = (token: string, id: string) => req<Task>(token, "GET", `/tasks/${id}`);
 
@@ -110,17 +131,3 @@ export interface CreateLabelInput {
 
 export const createLabel = (token: string, input: CreateLabelInput) =>
   req<Label>(token, "POST", "/labels", input);
-
-export async function whoami(token: string): Promise<{ full_name: string; email: string }> {
-  const res = await fetch("https://api.todoist.com/sync/v9/sync", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ sync_token: "*", resource_types: '["user"]' }),
-  });
-  if (!res.ok) throw new Error(`Todoist whoami → ${res.status}`);
-  const data = (await res.json()) as { user: { full_name: string; email: string } };
-  return data.user;
-}
