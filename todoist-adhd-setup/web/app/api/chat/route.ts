@@ -1,7 +1,8 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { runChat } from "@/lib/anthropic";
+import { runChat } from "@/lib/agent";
 import { requireAuth, UnauthorizedError } from "@/lib/auth";
+import { readProviderFromHeaders } from "@/lib/providers";
 import type { ChatRequest, StreamEvent } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -24,6 +25,16 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  let provider;
+  try {
+    provider = readProviderFromHeaders(req.headers);
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Bad provider config" },
+      { status: 400 },
+    );
+  }
+
   let body: ChatRequest;
   try {
     body = await req.json();
@@ -38,7 +49,7 @@ export async function POST(req: NextRequest) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        for await (const event of runChat(body.messages)) {
+        for await (const event of runChat(provider, body.messages)) {
           controller.enqueue(encoder.encode(sse(event)));
         }
       } catch (err) {
