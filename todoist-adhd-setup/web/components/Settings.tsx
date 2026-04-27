@@ -93,7 +93,9 @@ export default function Settings({ initial, onSaved, onCancel }: Props) {
                 ? "sk-ant-..."
                 : config.id === "openai"
                   ? "sk-..."
-                  : "any token (or leave blank for local)"
+                  : config.id === "google"
+                    ? "AIza..."
+                    : "any token (or leave blank for local)"
             }
             className="w-full rounded-lg bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none ring-1 ring-zinc-800 focus:ring-zinc-600"
           />

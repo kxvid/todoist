@@ -1,6 +1,6 @@
 # Todoist Co-pilot — web app
 
-Chat with any LLM → tasks land in your Todoist. Mobile-first PWA, deploys to Vercel free tier. **Bring-your-own-key** model auth — supports Anthropic, OpenAI, and any OpenAI-compatible server (Ollama, LM Studio, vLLM, llama.cpp, Groq, Together, Mistral).
+Chat with any LLM → tasks land in your Todoist. Mobile-first PWA, deploys to Vercel free tier. **Bring-your-own-key** model auth — supports Anthropic, OpenAI, Google Gemini, and any OpenAI-compatible server (Ollama, LM Studio, vLLM, llama.cpp, Groq, Together, Mistral).
 
 ## Architecture
 
@@ -21,7 +21,7 @@ web/
     todoist.ts            Todoist REST API wrappers
     tools.ts              ai/tool() definitions for the agent loop
     agent.ts              streamText + tool loop, provider-agnostic
-    providers.ts          Provider registry (Anthropic / OpenAI / OpenAI-compat)
+    providers.ts          Provider registry (Anthropic / OpenAI / Google / OpenAI-compat)
     settings.ts           localStorage helpers (client-only)
     systemPrompt.ts       ADHD-tuned system prompt
     auth.ts               Bearer token check
@@ -83,7 +83,7 @@ Then in Settings:
 
 All routes except `/api/auth` require:
 - `Authorization: Bearer <token>` (gates the app)
-- `x-model-provider` (`anthropic` | `openai` | `openai-compatible`)
+- `x-model-provider` (`anthropic` | `openai` | `google` | `openai-compatible`)
 - `x-model-key` (the user's API key)
 - `x-model-name` (model identifier)
 - `x-model-base-url` (only for `openai-compatible`)

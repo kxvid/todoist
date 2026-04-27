@@ -1,8 +1,9 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import type { LanguageModel } from "ai";
 
-export type ProviderId = "anthropic" | "openai" | "openai-compatible";
+export type ProviderId = "anthropic" | "openai" | "google" | "openai-compatible";
 
 export interface ProviderConfig {
   id: ProviderId;
@@ -39,6 +40,19 @@ export const PROVIDERS: ProviderInfo[] = [
     modelExamples: ["gpt-4o", "gpt-4o-mini", "o3-mini"],
   },
   {
+    id: "google",
+    label: "Google Gemini",
+    description: "Gemini 2.5 / 2.0 / 1.5 — Flash is fast and cheap, Pro is smartest.",
+    defaultModel: "gemini-2.5-flash",
+    needsBaseURL: false,
+    modelExamples: [
+      "gemini-2.5-flash",
+      "gemini-2.5-flash-lite",
+      "gemini-2.5-pro",
+      "gemini-2.0-flash",
+    ],
+  },
+  {
     id: "openai-compatible",
     label: "OpenAI-compatible (local / OSS)",
     description:
@@ -68,6 +82,10 @@ export function getModel(config: ProviderConfig): LanguageModel {
     case "openai": {
       if (!apiKey) throw new Error("OpenAI API key is required");
       return createOpenAI({ apiKey, compatibility: "strict" })(model);
+    }
+    case "google": {
+      if (!apiKey) throw new Error("Google API key is required");
+      return createGoogleGenerativeAI({ apiKey })(model);
     }
     case "openai-compatible": {
       const baseURL = config.baseURL?.trim();
