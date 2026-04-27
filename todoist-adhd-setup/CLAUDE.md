@@ -37,17 +37,19 @@ Two tools for an ADHD-optimized Todoist workflow:
 `cd web && npx vercel --prod`. Set the three env vars in the Vercel dashboard.
 
 ## Key implementation notes
-- Model: `claude-sonnet-4-6` (set in `web/lib/anthropic.ts`).
-- Tool use loop: uses `client.beta.messages.toolRunner({stream: true, ...})` from the official `@anthropic-ai/sdk` — handles the agentic loop automatically.
-- Prompt caching: `cache_control: {type: "ephemeral"}` is set top-level so the system prompt + tool definitions are cached (~10× cheaper on repeat requests).
-- Auth: simple bearer token (the `APP_PASSWORD` value). Designed to be portable — same scheme works for a future React Native client.
-- `lib/` is intentionally framework-free so it can be lifted into a React Native app later (Rork / Expo) for an iOS App Store build.
+- **Model layer**: Vercel AI SDK (`ai`, `@ai-sdk/anthropic`, `@ai-sdk/openai`) — provider-agnostic. Configured at request-time via headers.
+- **BYOK**: Each user pastes their own provider + API key + model in the Settings panel. Stored in browser `localStorage`, sent as `x-model-*` headers per request, never persisted server-side.
+- **Hot-swappable providers**: Anthropic (Claude), OpenAI (GPT/o-series), and OpenAI-compatible (covers Ollama, LM Studio, vLLM, Groq, Together, Mistral, any local OSS server). Adding a new provider is one entry in `lib/providers.ts`.
+- **Tool use**: `ai/tool()` definitions in `lib/tools.ts`. The AI SDK's `streamText` runs the loop with `maxSteps: 8`.
+- **Auth**: shared `APP_PASSWORD` bearer token gates the app. Per-user accounts (Clerk) and conversation persistence (Vercel KV) are deliberately not yet wired — design ready for them.
+- `lib/` is intentionally framework-free so it can be lifted into a React Native app later for an iOS App Store build.
 
 ## Editing things
-- **Add a Todoist tool**: drop a new `betaZodTool({...})` into `web/lib/tools.ts`. The tool runner picks it up automatically.
+- **Add a Todoist tool**: drop a new `tool({ description, parameters, execute })` entry into the `makeTools` return object in `web/lib/tools.ts`.
+- **Add a model provider**: install its `@ai-sdk/<provider>` package, append an entry to `PROVIDERS` and a case to `getModel` in `web/lib/providers.ts`, extend the `ProviderId` union.
 - **Change the agent's behavior**: edit `web/lib/systemPrompt.ts` (project structure, label semantics, defaults).
 - **Change the project structure**: edit the `PROJECTS` / `LABELS` / `FILTERS` dicts at the top of `setup.py`, then re-run.
-- **Switch model**: change `MODEL` in `web/lib/anthropic.ts`.
+- **Switch the user's model**: in the running app, click the ⚙️ button → Settings.
 
 ## Important
 - `setup.py` is idempotent — safe to re-run.

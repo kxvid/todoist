@@ -1,7 +1,8 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { runCapture } from "@/lib/anthropic";
+import { runCapture } from "@/lib/agent";
 import { requireAuth, UnauthorizedError } from "@/lib/auth";
+import { readProviderFromHeaders } from "@/lib/providers";
 import type { CaptureRequest } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -20,6 +21,16 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  let provider;
+  try {
+    provider = readProviderFromHeaders(req.headers);
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Bad provider config" },
+      { status: 400 },
+    );
+  }
+
   let body: CaptureRequest;
   try {
     body = await req.json();
@@ -31,7 +42,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const reply = await runCapture(body.text);
+    const reply = await runCapture(provider, body.text);
     return NextResponse.json({ reply });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

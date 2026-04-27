@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { buildProviderHeaders, type ProviderConfig } from "@/lib/providers";
 
 interface Props {
   token: string;
+  provider: ProviderConfig;
 }
 
-export default function QuickCapture({ token }: Props) {
+export default function QuickCapture({ token, provider }: Props) {
   const [text, setText] = useState("");
   const [reply, setReply] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -24,6 +26,7 @@ export default function QuickCapture({ token }: Props) {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
+          ...buildProviderHeaders(provider),
         },
         body: JSON.stringify({ text }),
       });

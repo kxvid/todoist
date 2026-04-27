@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { buildProviderHeaders, type ProviderConfig } from "@/lib/providers";
 import type { ChatMessage, StreamEvent } from "@/lib/types";
 
 interface ToolEvent {
@@ -16,9 +17,10 @@ interface Turn {
 
 interface Props {
   token: string;
+  provider: ProviderConfig;
 }
 
-export default function Chat({ token }: Props) {
+export default function Chat({ token, provider }: Props) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -51,6 +53,7 @@ export default function Chat({ token }: Props) {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
+          ...buildProviderHeaders(provider),
         },
         body: JSON.stringify({ messages: apiMessages }),
       });
