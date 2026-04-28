@@ -37,17 +37,17 @@ Two tools for an ADHD-optimized Todoist workflow:
 `cd web && npx vercel --prod`. Set the three env vars in the Vercel dashboard.
 
 ## Key implementation notes
-- **Model layer**: Vercel AI SDK (`ai`, `@ai-sdk/anthropic`, `@ai-sdk/openai`) — provider-agnostic. Configured at request-time via headers.
+- **Engine-driven, not LLM-driven**: The LLM does ONE thing — parse the user's request into a structured `Plan` (`generateObject` call against a Zod-typed `OperationSchema`). A pure-code engine in `lib/engine.ts` executes the plan against Todoist deterministically. The LLM never orchestrates multi-step tool calls — that's why even Gemini Flash works reliably.
+- **Model layer**: Vercel AI SDK (`ai`, `@ai-sdk/anthropic`, `@ai-sdk/openai`, `@ai-sdk/google`) — provider-agnostic. Configured at request-time via headers.
 - **BYOK**: Each user pastes their own provider + API key + model in the Settings panel. Stored in browser `localStorage`, sent as `x-model-*` headers per request, never persisted server-side.
 - **Hot-swappable providers**: Anthropic (Claude), OpenAI (GPT/o-series), Google Gemini (Flash/Pro), and OpenAI-compatible (covers Ollama, LM Studio, vLLM, Groq, Together, Mistral, any local OSS server). Adding a new provider is one entry in `lib/providers.ts`.
-- **Tool use**: `ai/tool()` definitions in `lib/tools.ts`. The AI SDK's `streamText` runs the loop with `maxSteps: 8`.
 - **Auth**: shared `APP_PASSWORD` bearer token gates the app. Per-user accounts (Clerk) and conversation persistence (Vercel KV) are deliberately not yet wired — design ready for them.
 - `lib/` is intentionally framework-free so it can be lifted into a React Native app later for an iOS App Store build.
 
 ## Editing things
-- **Add a Todoist tool**: drop a new `tool({ description, parameters, execute })` entry into the `makeTools` return object in `web/lib/tools.ts`.
+- **Add a new Todoist operation**: add a discriminated-union variant to `OperationSchema` in `web/lib/intent.ts`, then add a matching `case` to the switch in `web/lib/engine.ts`. The parser auto-picks it up.
 - **Add a model provider**: install its `@ai-sdk/<provider>` package, append an entry to `PROVIDERS` and a case to `getModel` in `web/lib/providers.ts`, extend the `ProviderId` union.
-- **Change the agent's behavior**: edit `web/lib/systemPrompt.ts` (project structure, label semantics, defaults).
+- **Tune parsing behavior** (defaults, project mapping, label inference): edit the `PARSE_SYSTEM` constant in `web/lib/intent.ts`.
 - **Change the project structure**: edit the `PROJECTS` / `LABELS` / `FILTERS` dicts at the top of `setup.py`, then re-run.
 - **Switch the user's model**: in the running app, click the ⚙️ button → Settings.
 

@@ -4,7 +4,29 @@ Chat with any LLM → tasks land in your Todoist. Mobile-first PWA, deploys to V
 
 ## Architecture
 
-The model layer is **provider-agnostic** via the [Vercel AI SDK](https://sdk.vercel.ai/docs). Adding a new provider is one entry in `lib/providers.ts`.
+**The orchestration logic is in code, not the LLM.** The model's only job is parsing the user's natural-language request into a structured `Plan` (a list of typed operations). A deterministic engine then executes the plan against Todoist. This makes small/cheap models (Gemini Flash, GPT-4o-mini, OSS like Gemma) fully reliable for this app — there is no multi-step tool-calling loop for them to get lost in.
+
+```
+                ┌──────────────────┐
+   user ───────▶│  intent.ts       │   parseIntent()
+                │  (LLM parser)    │   Single generateObject() call.
+                └────────┬─────────┘   Output: Plan = { operations: [...] }
+                         │
+                         ▼
+                ┌──────────────────┐
+                │  engine.ts       │   executePlan()
+                │  (no LLM)        │   Resolves project hints to IDs,
+                │                  │   matches task queries, calls
+                │                  │   the Todoist API, collects
+                │                  │   per-op results.
+                └────────┬─────────┘
+                         │
+                         ▼
+                ┌──────────────────┐
+                │  agent.ts        │   Streams tool_use → tool_result →
+                │  (orchestrator)  │   templated text summary back to UI.
+                └──────────────────┘
+```
 
 ```
 web/
@@ -18,15 +40,40 @@ web/
   components/
     Login.tsx, Chat.tsx, QuickCapture.tsx, Settings.tsx
   lib/                    Pure, framework-free (port these to RN as-is)
-    todoist.ts            Todoist REST API wrappers
-    tools.ts              ai/tool() definitions for the agent loop
-    agent.ts              streamText + tool loop, provider-agnostic
+    todoist.ts            Todoist API v1 wrappers
+    intent.ts             Plan schema + parseIntent() — the only LLM call
+    engine.ts             Pure operation executors against Todoist
+    agent.ts              parse → execute → emit, streaming pipeline
     providers.ts          Provider registry (Anthropic / OpenAI / Google / OpenAI-compat)
     settings.ts           localStorage helpers (client-only)
-    systemPrompt.ts       ADHD-tuned system prompt
     auth.ts               Bearer token check
     types.ts              Shared types
 ```
+
+## The Plan format
+
+Every user request becomes a list of operations from this discriminated union (defined in `lib/intent.ts`):
+
+| `type` | Purpose |
+|---|---|
+| `add_task` | Create a task with content, project_hint, labels, priority, due_string |
+| `update_task` | Modify an existing task matched by query phrase |
+| `complete_task` | Close a task by query phrase |
+| `delete_task` | Delete a task by query phrase |
+| `move_task` | Move a task to a different project |
+| `list_tasks` | Read tasks by Todoist filter or project |
+| `list_projects` | Show project tree |
+| `create_project` / `create_label` | Catalog management |
+| `clarify` | Ask the user; only when truly ambiguous |
+| `chat` | Plain conversational reply, no Todoist op |
+
+The engine resolves `project_hint` strings like `"Personal/Health"` to real IDs, so the LLM never has to deal with UUIDs.
+
+## Adding a new operation
+
+1. Add a new variant to `OperationSchema` in `lib/intent.ts`
+2. Add a corresponding `case` to the switch in `lib/engine.ts`'s `executeOne`
+3. Done — the parser will pick it up automatically because the LLM sees the schema
 
 ## How BYOK works
 
